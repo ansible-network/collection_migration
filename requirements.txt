@@ -18,8 +18,8 @@ aiohttp==3.6.2 \
     --hash=sha256:ae55bac364c405caa23a4f2d6cfecc6a0daada500274ffca4a9230e7129eac59 \
     --hash=sha256:b778ce0c909a2653741cb4b1ac7015b5c130ab9c897611df43ae6a58523cb965 \
     # via octomachinery
-ansible==2.9.2 \
-    --hash=sha256:2f83f8ccc50640aa41a24f6e7757ac06b0ee6189fdcaacab68851771d3b42f3a
+ansible==2.9.4 \
+    --hash=sha256:2517bf4743d52f00d509396a41e9ce44e5bc1285bd7aa53dfe28ea02fc1a75a6
 appdirs==1.4.3 \
     --hash=sha256:9e5896d1372858f8dd3344faf4e5014d21849c756c8d5701f78f8a103b372d92 \
     --hash=sha256:d8b24664561d0d34ddfaec54636d502d7cea6e29c3eaf68f3df6180863e2166e \
@@ -104,9 +104,9 @@ environ-config==19.1.0 \
 envparse==0.2.0 \
     --hash=sha256:4f3b9a27bb55d27f124eb4adf006fec05e4588891c9a054a183a112645056eb7 \
     # via octomachinery
-gidgethub==3.2.0 \
-    --hash=sha256:4f1a4cd8ea73ee44245fa510f01ce602cd328745bf83a3342d08d168a604f4c6 \
-    --hash=sha256:8f4b69063a256994d38243cc0eba4e1453017b5b8b04a173216d02d47ffc3989
+gidgethub==3.3.0 \
+    --hash=sha256:3692d2df48a23c87ec4a5e74053ce343bc59cea7c34488a9136754a35aeb177a \
+    --hash=sha256:4a456758a5fc8bfd581f297df90f2d09efbb830ccd209b1ceba4723705607d70
 idna==2.8 \
     --hash=sha256:c357b3f628cf53ae2c4c05627ecc484553142ca23264e593d327bcde5e9c3407 \
     --hash=sha256:ea8b7f6188e6fa117537c3df7da9fc686d485087abf6ac197f9c46432f7e4a3c \
@@ -166,9 +166,9 @@ multidict==4.6.1 \
     --hash=sha256:cfec9d001a83dc73580143f3c77e898cf7ad78b27bb5e64dbe9652668fcafec7 \
     --hash=sha256:efaf1b18ea6c1f577b1371c0159edbe4749558bfe983e13aa24d0a0c01e1ad7b \
     # via aiohttp, yarl
-octomachinery==0.1.1 \
-    --hash=sha256:61ea5535ba3f56e0cee5a0176e98050e08755f95f8694385a106916879a66a7d \
-    --hash=sha256:f17c7a85870773e127c00b5254468c3698117eeb02da10046a1f062a24f73846
+octomachinery==0.1.2 \
+    --hash=sha256:8f6e56670bd6b5095b58db9622ac012257663c67bd0d723041125bd816eb4460 \
+    --hash=sha256:a769454533d6385a40865ad9cbb9f636cec18ca1854eab8194d7cee4685c30ce
 pycparser==2.19 \
     --hash=sha256:a988718abfad80b6b157acce7bf130a30876d27603738ac39f140993246b25b3 \
     # via cffi

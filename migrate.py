@@ -5,6 +5,7 @@
 import argparse
 import configparser
 import contextlib
+import functools
 import glob
 import itertools
 import logging
@@ -94,6 +95,9 @@ logzero.logfile(LOGFILE, loglevel=logging.WARNING)
 
 core = {}
 manual_check = defaultdict(list)
+
+
+class UnmovablePathStr(str): ...
 
 
 def add_core(ptype, name):
@@ -193,7 +197,7 @@ def actually_remove(checkout_path, namespace, collection):
     subprocess.check_call(('git', 'add', 'test/sanity/ignore.txt'), cwd=checkout_path)
 
     # commit the changes
-    subprocess.check_call(('git', 'commit', '-m', 'Migrated to %s.%s' % (namespace, collection)), cwd=checkout_path)
+    subprocess.check_call(('git', 'commit', '-m', 'Migrated to %s.%s' % (namespace, collection), '--allow-empty'), cwd=checkout_path)
 
 
 def read_yaml_file(path):
@@ -349,6 +353,44 @@ def rewrite_class_property(mod_fst, collection, namespace, filename):
             # so this might be something like:
             # transport = CONNECTION_TRANSPORT
             add_manual_check(property_name, val.value, filename)
+
+
+def normalize_implicit_relative_imports_in_unit_tests(mod_fst, file_path):
+    """Locate implicit imports and prepend them with dot."""
+    cur_pkg_dir = os.path.dirname(file_path)
+    make_pkg_subpath = functools.partial(os.path.join, cur_pkg_dir)
+    for imp in mod_fst.find_all(('from_import', )):
+        if not imp.value:  # from . import something
+            continue
+
+        *pkg_path_parts, pkg_or_mod = tuple(t.value for t in imp.value)
+        if (
+                (pkg_path_parts and not pkg_path_parts[0])
+                or (not pkg_path_parts and pkg_or_mod == '__future__')
+        ):  # import is already absolute
+            continue
+
+        relative_mod_path = make_pkg_subpath(
+            *pkg_path_parts, f'{pkg_or_mod}.py',
+        )
+        if relative_mod_path == file_path:  # self-import? nope! def other mod
+            continue
+
+        relative_pkg_init_path = make_pkg_subpath(
+            *pkg_path_parts, pkg_or_mod, '__init__.py',
+        )
+
+        possible_relative_targets = {relative_mod_path, relative_pkg_init_path}
+        relative_imp_target_exists = any(
+            os.path.exists(p) for p in possible_relative_targets
+        )
+
+        if not relative_imp_target_exists:
+            continue
+
+        # turn implicit relative import into an explicit absolute import
+        # that is relative to the current module
+        imp.value = f'.{imp.value.dumps()!s}'
 
 
 def rewrite_unit_tests_patch(mod_fst, collection, spec, namespace, args):
@@ -690,26 +732,38 @@ def rewrite_imports_in_fst(mod_fst, import_map, collection, spec, namespace, arg
 
 
 def rewrite_py(src, dest, collection, spec, namespace, args):
-    mod_src_text, mod_fst = read_module_txt_n_fst(src)
+    with fst_rewrite_session(src, dest) as mod_fst:
+        import_deps = rewrite_imports(
+            mod_fst, collection, spec, namespace, args,
+        )
 
-    import_deps = rewrite_imports(mod_fst, collection, spec, namespace, args)
+        try:
+            docs_deps = rewrite_plugin_documentation(
+                mod_fst, collection, spec, namespace, args,
+            )
+        except LookupError as err:
+            docs_deps = []
+            logger.debug('%s in %s', err, src)
 
-    try:
-        docs_deps = rewrite_plugin_documentation(mod_fst, collection, spec, namespace, args)
-    except LookupError as err:
-        docs_deps = []
-        logger.debug('%s in %s', err, src)
-
-    rewrite_class_property(mod_fst, collection, namespace, dest)
-
-    plugin_data_new = mod_fst.dumps()
-
-    if mod_src_text != plugin_data_new:
-        logger.info('Rewriting plugin references in %s', dest)
-
-    write_text_into_file(dest, plugin_data_new)
+        rewrite_class_property(mod_fst, collection, namespace, dest)
 
     return (import_deps, docs_deps)
+
+
+@contextlib.contextmanager
+def fst_rewrite_session(src_path, dst_path):
+    """Parse the module FST and save it to disk afterwards."""
+    mod_src_text, mod_fst = read_module_txt_n_fst(src_path)
+
+    yield mod_fst
+
+    new_mod_src_text = mod_fst.dumps()
+
+    if src_path == dst_path and mod_src_text == new_mod_src_text:
+        return
+
+    logger.info('Rewriting plugin references in %s', dst_path)
+    write_text_into_file(dst_path, new_mod_src_text)
 
 
 def read_module_txt_n_fst(path):
@@ -971,7 +1025,7 @@ def create_unit_tests_copy_map(checkout_path, collection_dir, plugin_type, plugi
     # TODO: figure out the bug with path maps
     compat_mock_helpers = (
         (
-            src_f,
+            UnmovablePathStr(src_f),
             replace_path_prefix(src_f),
         )
         for hd in {'compat', 'mock', 'modules/utils.py'}
@@ -980,8 +1034,7 @@ def create_unit_tests_copy_map(checkout_path, collection_dir, plugin_type, plugi
             checkout_path,
         )
     )
-    for src_f, dst_f in compat_mock_helpers:
-        copy_map[src_f] = dst_f
+    copy_map.update(compat_mock_helpers)
 
     def discover_file_migrations(paths, *, find_related=False):
         """Generate the migration map for given paths.
@@ -1040,20 +1093,30 @@ def create_unit_tests_copy_map(checkout_path, collection_dir, plugin_type, plugi
 
 def copy_unit_tests(copy_map, collection_dir, checkout_path):
     """Copy unit tests into a collection using a copy map."""
+    if not copy_map:
+        logger.info(
+            'No unit tests scheduled for copying to %s', collection_dir,
+        )
+        return
+
     for src_f, dest_f in copy_map.items():
         if os.path.splitext(src_f)[1] in BAD_EXT:
             continue
+
+        should_be_preserved = isinstance(src_f, UnmovablePathStr)
 
         dest = os.path.join(collection_dir, dest_f)
         # Ensure target dir exists
         os.makedirs(os.path.dirname(dest), exist_ok=True)
 
         src = os.path.join(checkout_path, src_f)
-        logger.info('Copying %s -> %s', src, dest)
+        logger.info(
+            f'{"Copying" if should_be_preserved else "Moving"} %s -> %s',
+            src, dest,
+        )
         shutil.copy(src, dest)
 
-        if src == '.cache/releases/devel.git/test/units/modules/utils.py':
-            # FIXME this appears to be bundled with each collection (above), so do not remove it, this should stay in core?
+        if should_be_preserved:
             continue
 
         remove(src)
@@ -1141,15 +1204,18 @@ def assemble_collections(checkout_path, spec, args, target_github_org):
                     relative_src_plugin_path = os.path.join(src_plugin_base, plugin)
                     src = os.path.join(checkout_path, relative_src_plugin_path)
 
-                    if os.path.basename(plugin).startswith('_') and os.path.basename(plugin) != '__init__.py':
-                        if os.path.islink(src):
-                            logger.info("Removing plugin alias from checkout and skipping: %s (%s in %s.%s)",
-                                         plugin, plugin_type, namespace, collection)
-                            remove(src)
-                        else:
-                            logger.error("We should not be migrating deprecated plugins, skipping: %s (%s in %s.%s)",
-                                         plugin, plugin_type, namespace, collection)
-                        continue
+                    # TODO: colleciotns are now scheduled to handle deprecations and aliases, until we get an implementation
+                    # we are just treating them as normal files for now (previouslly we were avoiding them.
+
+                    #if os.path.basename(plugin).startswith('_') and os.path.basename(plugin) != '__init__.py':
+                    #    if os.path.islink(src):
+                    #        logger.info("Removing plugin alias from checkout and skipping: %s (%s in %s.%s)",
+                    #                     plugin, plugin_type, namespace, collection)
+                    #        remove(src)
+                    #    else:
+                    #        logger.error("We should not be migrating deprecated plugins, skipping: %s (%s in %s.%s)",
+                    #                     plugin, plugin_type, namespace, collection)
+                    #    continue
 
                     remove(src)
 
@@ -1333,10 +1399,16 @@ def rewrite_unit_tests(collection_dir, collection, spec, namespace, args):
             (os.path.join(dp, f) for f in fn if f.endswith('.py'))
             for dp, dn, fn in os.walk(os.path.join(collection_dir, 'tests', 'unit'))
     ):
-        _unit_test_module_src_text, unit_test_module_fst = read_module_txt_n_fst(file_path)
-        deps += rewrite_imports(unit_test_module_fst, collection, spec, namespace, args)
-        deps += rewrite_unit_tests_patch(unit_test_module_fst, collection, spec, namespace, args)
-        write_text_into_file(file_path, unit_test_module_fst.dumps())
+        with fst_rewrite_session(file_path, file_path) as unit_test_module_fst:
+            deps += rewrite_imports(
+                unit_test_module_fst, collection, spec, namespace, args,
+            )
+            deps += rewrite_unit_tests_patch(
+                unit_test_module_fst, collection, spec, namespace, args,
+            )
+            normalize_implicit_relative_imports_in_unit_tests(
+                unit_test_module_fst, file_path,
+            )
 
     return deps
 
@@ -1431,6 +1503,7 @@ def assert_migrating_git_tracked_resources(
 
 def mark_moved_resources(checkout_dir, namespace, collection, migrated_to_collection):
     """Mark migrated paths in botmeta."""
+    migrated_to_collection = {str(k): str(v) for k, v in migrated_to_collection.items()}
     assert_migrating_git_tracked_resources(migrated_to_collection)
 
     migrated_to = '.'.join((namespace, collection))
@@ -1709,15 +1782,12 @@ def _rewrite_yaml(contents, namespace, collection, spec, args, dest):
 def _rewrite_yaml_mapping(el, namespace, collection, spec, args, dest):
     assert isinstance(el, Mapping)
 
-    _rewrite_yaml_mapping_keys(el, namespace, collection, spec, args, dest)
-    _rewrite_yaml_mapping_keys_non_vars(el, namespace, collection, spec, args)
+    _rewrite_yaml_mapping_keys_vars(el, namespace, collection, spec, args, dest)
+    _rewrite_yaml_mapping_keys_non_vars(el, namespace, collection, spec, args, dest)
     _rewrite_yaml_mapping_values(el, namespace, collection, spec, args, dest)
 
 
-KEYWORD_TO_PLUGIN_MAP = {
-    'ansible_become_method': 'become',
-    'ansible_connection': 'connection',
-    'ansible_shell_type': 'shell',
+KEYWORDS_TO_PLUGIN_MAP = {
     'become_method': 'become',
     'cache_plugin': 'cache',
     'connection': 'connection',
@@ -1726,10 +1796,10 @@ KEYWORD_TO_PLUGIN_MAP = {
 }
 
 
-def _rewrite_yaml_mapping_keys_non_vars(el, namespace, collection, spec, args):
+def _rewrite_yaml_mapping_keys_non_vars(el, namespace, collection, spec, args, dest):
     translate = []
     for key in el.keys():
-        if is_reserved_name(key):
+        if key not in KEYWORDS_TO_PLUGIN_MAP and is_reserved_name(key):
             continue
 
         prefix = 'with_'
@@ -1773,44 +1843,54 @@ def _rewrite_yaml_mapping_keys_non_vars(el, namespace, collection, spec, args):
                     translate.append((new_module_name, key))
                     integration_tests_add_to_deps((namespace, collection), (ns, coll))
 
+        if key in KEYWORDS_TO_PLUGIN_MAP:
+            _rewrite_yaml_mapping_value(namespace, collection, el, key, KEYWORDS_TO_PLUGIN_MAP[key], spec, args, dest)
+
     for new_key, old_key in translate:
         el[new_key] = el.pop(old_key)
 
 
-def _rewrite_yaml_mapping_keys(el, namespace, collection, spec, args, dest):
+def _rewrite_yaml_mapping_value(namespace, collection, el, key, plugin_type, spec, args, dest):
+    try:
+        plugin_namespace, plugin_collection = get_plugin_collection(el[key], plugin_type, spec)
+    except LookupError:
+        if '{{' in el[key]:
+            add_manual_check(key, el[key], dest)
+        return
+
+    if plugin_collection in COLLECTION_SKIP_REWRITE:
+        return
+    new_plugin_name = get_plugin_fqcn(plugin_namespace, plugin_collection, el[key])
+
+    msg = 'Rewriting to %s' % new_plugin_name
+    if args.fail_on_core_rewrite:
+        raise RuntimeError(msg)
+
+    logger.debug(msg)
+    el[key] = new_plugin_name
+    integration_tests_add_to_deps((namespace, collection), (plugin_namespace, plugin_collection))
+
+
+VARNAMES_TO_PLUGIN_MAP = {
+    'ansible_become_method': 'become',
+    'ansible_connection': 'connection',
+    'ansible_shell_type': 'shell',
+}
+
+
+def _rewrite_yaml_mapping_keys_vars(el, namespace, collection, spec, args, dest):
     for key in el.keys():
-        if is_reserved_name(key):
-            continue
-
-        plugin_type = KEYWORD_TO_PLUGIN_MAP.get(key)
-        if plugin_type is None:
-            continue
-
-        try:
-            plugin_namespace, plugin_collection = get_plugin_collection(el[key], plugin_type, spec)
-            if plugin_collection in COLLECTION_SKIP_REWRITE:
-                continue
-            new_plugin_name = get_plugin_fqcn(plugin_namespace, plugin_collection, el[key])
-
-            msg = 'Rewriting to %s' % new_plugin_name
-            if args.fail_on_core_rewrite:
-                raise RuntimeError(msg)
-
-            logger.debug(msg)
-            el[key] = new_plugin_name
-            integration_tests_add_to_deps((namespace, collection), (plugin_namespace, plugin_collection))
-        except LookupError:
-            if '{{' in el[key]:
-                add_manual_check(key, el[key], dest)
+        if key in VARNAMES_TO_PLUGIN_MAP:
+            _rewrite_yaml_mapping_value(namespace, collection, el, key, VARNAMES_TO_PLUGIN_MAP[key], spec, args, dest)
 
 
 def _rewrite_yaml_mapping_values(el, namespace, collection, spec, args, dest):
     for key, value in el.items():
         if isinstance(value, Mapping):
             if key == 'vars':
-                _rewrite_yaml_mapping_keys(el[key], namespace, collection, spec, args, dest)
+                _rewrite_yaml_mapping_keys_vars(el[key], namespace, collection, spec, args, dest)
             if key != 'vars':
-                _rewrite_yaml_mapping_keys_non_vars(el[key], namespace, collection, spec, args)
+                _rewrite_yaml_mapping_keys_non_vars(el[key], namespace, collection, spec, args, dest)
         elif isinstance(value, list):
             for idx, item in enumerate(value):
                 if isinstance(item, Mapping):

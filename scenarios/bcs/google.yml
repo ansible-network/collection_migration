@@ -1,4 +1,4 @@
-gcp:
+cloud:
     doc_fragments:
     - gcp.py
     inventory:
@@ -12,3 +12,5 @@ gcp:
     - gce.py
     - gcp.py
     - gcp_utils.py
+    lookup:
+    - gcp_storage_file.py

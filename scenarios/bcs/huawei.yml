@@ -1,4 +1,9 @@
 cloudengine:
+    action:
+    - ce.py
+    - ce_template.py
+    cliconf:
+    - ce.py
     doc_fragments:
     - ce.py
     netconf:
@@ -16,6 +21,5 @@ cloud:
     - hwc.py
     module_utils:
     - hwc_utils.py
-    - cloud/hwc/*
     modules:
     - cloud/huawei/*

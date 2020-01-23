@@ -6,7 +6,6 @@ _core:
     - gather_facts.py
     - group_by.py
     - netconf.py
-    - netcommon.py
     - normal.py
     - package.py
     - patch.py
@@ -27,7 +26,6 @@ _core:
     - memory.py
     - pickle.py
     callback:
-    - __init__.py  # has base classes
     - default.py
     - minimal.py
     - oneline.py
@@ -95,6 +93,7 @@ _core:
     - connection.py
     - common/*
     - common/text/*
+    - csharp/*
     - compat/__init__.py
     - compat/paramiko.py
     - distro/__init__.py
@@ -115,6 +114,7 @@ _core:
     - facts/virtual/*
     - json_utils.py
     - parsing/*
+    - powershell/*
     - service.py
     - splitter.py
     - six/*
@@ -137,6 +137,7 @@ _core:
     - files/stat.py
     - inventory/add_host.py
     - inventory/group_by.py
+    - network/netconf/*
     - net_tools/basics/get_url.py
     - net_tools/basics/slurp.py
     - net_tools/basics/uri.py
@@ -165,6 +166,7 @@ _core:
     - system/getent.py
     - system/group.py
     - system/hostname.py
+    - system/iptables.py
     - system/known_hosts.py
     - system/ping.py
     - system/reboot.py
@@ -249,6 +251,8 @@ amazon:
     - aws_credentials.py
     - aws_region.py
     - ec2.py
+    connection:
+    - aws_ssm.py
     callback:
     - aws_resource_actions.py
     inventory:
@@ -294,7 +298,7 @@ asa:
     doc_fragments:
     - asa.py
     module_utils:
-    - network/asa/asa.py
+    - network/asa/*
     modules:
     - network/asa/*
     terminal:
@@ -348,7 +352,7 @@ containers:
     - podman.py
     module_utils:
     - lxd.py
-    - podman/common.py
+    - podman/*
     modules:
     - cloud/lxc/*
     - cloud/lxd/*
@@ -374,11 +378,9 @@ docker:
     connection:
     - docker.py
     inventory:
-    - docker_swarm.py
-    - docker_machine.py
+    - docker_*.py
     module_utils:
-    - docker/common.py
-    - docker/swarm.py
+    - docker/*
     modules:
     - cloud/docker/*
 emc:
@@ -397,6 +399,8 @@ enos:
     - enos.py
     modules:
     - network/enos/*
+    module_utils:
+    - network/enos/*
     terminal:
     - enos.py
 exoscale:
@@ -413,8 +417,10 @@ frr:
     - network/frr/*
     module_utils:
     - network/frr/*
+    - network/frr/*/*
     - network/frr/*/*/*
     - network/frr/*/*/*/*
+    - network/frr/*/*/*/*/*
     terminal:
     - frr.py
 fortios:
@@ -426,12 +432,17 @@ fortios:
     - fortios.py
     module_utils:
     - network/fortios/*
+    - network/fortios/*/*
+    - network/fortios/*/*/*
     modules:
     - network/fortios/*
 gitlab:
+    inventory:
+    - gitlab_runners.py
+    module_utils:
+    - gitlab.py
     modules:
-    - source_control/_gitlab_hooks.py
-    - source_control/gitlab_*
+    - source_control/gitlab/*
 hetzner:
     doc_fragments:
     - hcloud.py
@@ -451,11 +462,17 @@ infoblox:
     - nios.py
     - nios_next_ip.py
     - nios_next_network.py
+    modules:
+    - net_tools/nios/*
+    module_utils:
+    - net_tools/nios/*
 ironware:
+    action:
+    - ironware.py
     doc_fragments:
     - ironware.py
     module_utils:
-    - network/ironware/ironware.py
+    - network/ironware/*
     modules:
     - network/ironware/*
     terminal:
@@ -494,6 +511,7 @@ keycloak:
     doc_fragments:
     - keycloak.py
     module_utils:
+    - identity/*
     - identity/keycloak/*
     modules:
     - identity/keycloak/*
@@ -504,6 +522,8 @@ layer3:
     modules:
     - network/layer3/*
 misc:
+    action:
+    - slxos.py
     become:
     - dzdo.py
     - pbrun.py
@@ -511,12 +531,12 @@ misc:
     - sesu.py
     doc_fragments:
     - auth_basic.py
+    - ecs_credential.py
     - ingate.py
     - ipa.py
     - ldap.py
     - lxca_common.py
     - manageiq.py
-    - meraki.py
     - mysql.py
     - netscaler.py
     - ovirt.py
@@ -568,8 +588,13 @@ misc:
     - sumologic.py
     - timer.py
     - yaml.py
+    cliconf:
+    - edgeswitch.py
+    - routeros.py
+    - slxos.py
     connection:
     - funcd.py
+    - saltstack.py
     lookup:
     - chef_databag.py
     - conjur_variable.py
@@ -587,6 +612,7 @@ misc:
     - ini.py
     - laps_password.py
     - lastpass.py
+    - lmdb_kv.py
     - manifold.py
     - mongodb.py
     - onepassword.py
@@ -596,6 +622,13 @@ misc:
     - rabbitmq.py
     - random_choice.py
     - redis.py
+    inventory:
+    - foreman.py
+    - netbox.py
+    - online.py
+    - openstack.py
+    - scaleway.py
+    - virtualbox.py
     filter:
     - json_query.py
     modules:
@@ -624,7 +657,7 @@ misc:
     - cloud/univention/*
     - cloud/webfaction/*
     - cloud/xenserver/*
-    - clustering/consul*
+    - clustering/consul/*
     - clustering/etcd3.py
     - clustering/pacemaker_cluster.py
     - clustering/znode.py
@@ -636,6 +669,7 @@ misc:
     - crypto/openssh_cert.py
     - crypto/openssh_keypair.py
     - crypto/openssl_*
+    - crypto/entrust/*
     - database/aerospike/aerospike_migrations.py
     - database/misc/elasticsearch_plugin.py
     - database/misc/kibana_plugin.py
@@ -643,6 +677,7 @@ misc:
     - database/misc/riak.py
     - database/mongodb/*
     - database/mssql/*
+    - database/mysql/*
     - database/postgresql/*
     - database/proxysql/*
     - database/vertica/*
@@ -651,6 +686,7 @@ misc:
     - files/iso_extract.py
     - files/read_csv.py
     - files/xml.py
+    - identity/cyberark/*
     - identity/ipa/*
     - identity/_onepassword_facts.py
     - identity/onepassword_info.py
@@ -659,7 +695,7 @@ misc:
     - monitoring/airbrake_deployment.py
     - monitoring/bigpanda.py
     - monitoring/circonus_annotation.py
-    - monitoring/datadog_*
+    - monitoring/datadog/*
     - monitoring/honeybadger_deployment.py
     - monitoring/icinga2_*
     - monitoring/librato_annotation.py
@@ -673,7 +709,7 @@ misc:
     - monitoring/pagerduty_alert.py
     - monitoring/pingdom.py
     - monitoring/rollbar_deployment.py
-    - monitoring/sensu_*.py
+    - monitoring/sensu/*
     - monitoring/spectrum_device.py
     - monitoring/stackdriver.py
     - monitoring/statusio_maintenance.py
@@ -683,6 +719,7 @@ misc:
     - net_tools/dnsimple.py
     - net_tools/dnsmadeeasy.py
     - net_tools/haproxy.py
+    - net_tools/infinity/*
     - net_tools/ip_netns.py
     - net_tools/ipify_facts.py
     - net_tools/ipinfoio_facts.py
@@ -694,41 +731,26 @@ misc:
     - net_tools/omapi_host.py
     - net_tools/snmp_facts.py
     - network/aos/*
-    - network/bigswitch/bcf_switch.py
-    - network/bigswitch/bigmon_chain.py
-    - network/bigswitch/bigmon_policy.py
-    - network/citrix/_netscaler.py
+    - network/bigswitch/*
+    - network/cloudvision/*
+    - network/citrix/*
     - network/cumulus/*
     - network/edgeos/*
-    - network/edgeswitch/edgeswitch_facts.py
-    - network/edgeswitch/edgeswitch_vlan.py
-    - network/eric_eccli/eric_eccli_command.py
+    - network/edgeswitch/*
+    - network/eric_eccli/*
     - network/fortimanager/*
-    - network/ftd/ftd_configuration.py
-    - network/ftd/ftd_file_download.py
-    - network/ftd/ftd_file_upload.py
-    - network/ftd/ftd_install.py
-    - network/icx/icx_banner.py
     - network/illumos/*
-    - network/ingate/ig_config.py
-    - network/ingate/ig_unit_information.py
-    - network/itential/iap_start_workflow.py
-    - network/itential/iap_token.py
-    - network/meraki/*
+    - network/ingate/*
+    - network/itential/*
     - network/netscaler/*
-    - network/netvisor/*
     - network/nos/*
     - network/nuage/nuage_vspk.py
     - network/onyx/*
-    - network/opx/opx_cps.py
-    - network/ordnance/ordnance_config.py
-    - network/ordnance/ordnance_facts.py
+    - network/opx/*
+    - network/ordnance/*
     - network/panos/*
-    - network/radware/vdirect_commit.py
-    - network/radware/vdirect_file.py
-    - network/radware/vdirect_runnable.py
-    - network/routeros/routeros_command.py
-    - network/routeros/routeros_facts.py
+    - network/radware/*
+    - network/routeros/*
     - network/slxos/*
     - notification/bearychat.py
     - notification/campfire.py
@@ -795,12 +817,10 @@ misc:
     - remote_management/stacki/stacki_host.py
     - remote_management/ucs/*
     - remote_management/wakeonlan.py
-    - source_control/_github_hooks.py
-    - source_control/_github_webhook_facts.py
     - source_control/bitbucket/*
     - source_control/bzr.py
     - source_control/git_config.py
-    - source_control/github_*
+    - source_control/github/*
     - source_control/hg.py
     - storage/glusterfs/_gluster_heal_facts.py
     - storage/glusterfs/gluster_heal_info.py
@@ -864,9 +884,27 @@ misc:
     - cloud.py
     - crypto.py
     - database.py
+    - ecs/*
+    - heroku.py
+    - ipa.py
+    - ldap.py
     - linode.py
+    - manageiq.py
+    - memset.py
     - mysql.py
+    - network/aos/*
+    - network/bigswitch/*
+    - network/fortimanager/*
+    - network/ingate/*
+    - net_tools/netbox/*
+    - network/netscaler/*
+    - network/nos/*
+    - network/onyx/*
+    - network/ordnance/*
+    - network/panos/*
+    - network/slxos/*
     - oneandone.py
+    - oneview.py
     - online.py
     - opennebula.py
     - openstack.py
@@ -891,24 +929,47 @@ netcommon:
     action:
     - cli_command.py
     - cli_config.py
-    - net_put.py
+    - edgeos_config.py
+    - net_banner.py
+    - net_base.py
+    - net_l2_interface.py
+    - net_l3_interface.py
+    - net_lldp.py
+    - net_lldp_interface.py
+    - net_linkagg.py
+    - net_logging.py
+    - net_interface.py
     - net_get.py
+    - net_ping.py
+    - net_put.py
+    - net_system.py
+    - net_static_route.py
+    - net_user.py
+    - net_vlan.py
+    - net_vrf.py
+    - network.py
+    - nos_config.py
+    - onyx_config.py
     - telnet.py
     become:
     - enable.py
     cliconf:
-    - nxos.py
+    - eric_eccli.py
+    - icx.py
+    - netvisor.py
+    - nos.py
     connection:
     - paramiko_ssh.py
     - napalm.py
     doc_fragments:
     - network_agnostic.py
+    - openswitch.py
     filter:
     - network.py
     httpapi:
+    - fortianalyzer.py
     - fortimanager.py
     - ftd.py
-    - nxos.py
     - qradar.py
     - restconf.py
     - splunk.py
@@ -919,39 +980,47 @@ netcommon:
     - network/cli/cli_config.py
     - network/files/net_get.py
     - network/files/net_put.py
+    - network/ftd/*
+    - network/fortianalyzer/*
+    - network/icx/*
     - network/interface/_net_*.py
+    - network/netvisor/*
+    - network/netact/*
     - network/protocol/_net_lldp.py
-    - network/restconf/restconf_config.py
-    - network/restconf/restconf_get.py
+    - network/restconf/*
     - network/routing/_net_static_route.py
     - network/system/_net_*.py
     module_utils:
     - compat/ipaddress.py
     - network/common/*
     - network/common/*/*
+    - network/edgeos/*
+    - network/edgeswitch/*
+    - network/eric_eccli/*
+    - network/ftd/*
+    - network/icx/*
+    - network/netvisor/*
+    - network/restconf/*
+    - network/routeros/*
     netconf:
     - default.py
-    - sros.py
     terminal:
     - edgeos.py
     - edgeswitch.py
     - eric_eccli.py
     - icx.py
-    - ios.py
     - netvisor.py
     - nos.py
-    - nxos.py
     - onyx.py
     - routeros.py
     - slxos.py
-    - sros.py
 nso:
     doc_fragments:
     - nso.py
     modules:
     - network/nso/*
     module_utils:
-    - network/nso/nso.py
+    - network/nso/*
 ovs:
     modules:
     - network/ovs/*
@@ -1044,6 +1113,7 @@ unix:
     - packaging/os/zypper_repository.py
     - system/alternatives.py
     - system/aix_*.py
+    - system/apk.py
     - system/at.py
     - system/authorized_key.py
     - system/capabilities.py
@@ -1052,7 +1122,6 @@ unix:
     - system/filesystem.py
     - system/firewalld.py
     - system/gconftool2.py
-    - system/iptables.py
     - system/lbu.py
     - system/locale_gen.py
     - system/lvg.py
@@ -1125,8 +1194,5 @@ windows:
     - '*_windows.py'
     modules:
     - windows/*
-    module_utils:
-    - csharp/*
-    - powershell/*
     shell:
     - cmd.py
